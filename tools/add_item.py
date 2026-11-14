@@ -6,6 +6,8 @@ Usage:  python3 tools/add_item.py item.json [item2.json ...]
 item.json fields:
   title, excerpt, rutitr, categories (list of WordPress category IDs),
   slider (bool), focus_keyword (optional),
+  short_title: REQUIRED headline of at most 8 words, shown in the homepage slider
+               (written by hand, never a cut-off title; no ellipsis),
   blocks: list of strings. A string starting with "<h2", "<ul" or "<ol" is used
           as-is; anything else becomes a paragraph.
   image_query: Wikimedia Commons search text (English works best)
@@ -95,12 +97,14 @@ def block(t):
 def add(path):
     with open(path, encoding='utf-8') as f:
         spec = json.load(f)
-    for k in ('title', 'excerpt', 'blocks', 'categories'):
+    for k in ('title', 'short_title', 'excerpt', 'blocks', 'categories'):
         if not spec.get(k):
             sys.exit(f'{path}: missing {k}')
     img = None
     if spec.get('image_file'):
         img = find_image(exact=spec['image_file'])
+    if len(spec['short_title'].split()) > 8:
+        sys.exit(f'{path}: short_title has more than 8 words')
     if not img and spec.get('image_query'):
         img = find_image(spec['image_query'], spec.get('image_pick'))
         if not img and spec.get('image_pick'):
@@ -124,7 +128,7 @@ def add(path):
                 '" target="_blank" rel="noopener">' + credit + '</a></small></p>\n<!-- /wp:paragraph -->')
 
     item = {'id': item_id, 'created': now.isoformat(), 'title': spec['title'], 'excerpt': spec['excerpt'],
-            'rutitr': spec.get('rutitr', ''), 'slider': bool(spec.get('slider')),
+            'rutitr': spec.get('rutitr', ''), 'short_title': spec['short_title'].strip(), 'slider': bool(spec.get('slider')),
             'categories': spec['categories'], 'focus_keyword': spec.get('focus_keyword', ''),
             'content': content,
             'image': {'path': rel, 'alt': spec.get('image_alt', spec['title']), 'caption': credit,

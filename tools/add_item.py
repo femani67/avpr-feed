@@ -6,6 +6,9 @@ Usage:  python3 tools/add_item.py item.json [item2.json ...]
 item.json fields:
   title, excerpt, rutitr, categories (list of WordPress category IDs),
   slider (bool), focus_keyword (optional),
+          OWNER RULE: an item about Mahan Air (category 56 or Mahan in the title) may be
+          published, but must NEVER be the slider item; the script forces slider off for it,
+          so choose a different item for the slider.
   short_title: REQUIRED headline of at most 8 words, shown in the homepage slider
                (written by hand, never a cut-off title; no ellipsis),
   blocks: list of strings. A string starting with "<h2", "<ul" or "<ol" is used
@@ -127,8 +130,14 @@ def add(path):
     content += ('\n\n<!-- wp:paragraph -->\n<p class="avpr-credit"><small><a href="' + img['page'] +
                 '" target="_blank" rel="noopener">' + credit + '</a></small></p>\n<!-- /wp:paragraph -->')
 
+    # Owner's rule: Mahan items may be published on the site but never on the homepage slider.
+    slider = bool(spec.get('slider'))
+    if slider and (56 in spec['categories'] or re.search('ماهان|mahan', spec['title'] + ' ' + spec.get('short_title', ''), re.I)):
+        print(f'NOTE: slider turned off for a Mahan item (owner rule): {spec["title"]} — pick another item for the slider')
+        slider = False
+
     item = {'id': item_id, 'created': now.isoformat(), 'title': spec['title'], 'excerpt': spec['excerpt'],
-            'rutitr': spec.get('rutitr', ''), 'short_title': spec['short_title'].strip(), 'slider': bool(spec.get('slider')),
+            'rutitr': spec.get('rutitr', ''), 'short_title': spec['short_title'].strip(), 'slider': slider,
             'categories': spec['categories'], 'focus_keyword': spec.get('focus_keyword', ''),
             'content': content,
             'image': {'path': rel, 'alt': spec.get('image_alt', spec['title']), 'caption': credit,

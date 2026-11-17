@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 FEED = os.path.join(ROOT, 'feed.json')
-UA = 'AVPR-Feed-Bot/1.0 (https://avpr.ir; femani67@gmail.com)'
+UA = 'AVPR-Feed-Bot/1.0 (https://avpr.ir; https://github.com/femani67/avpr-feed)'
 API = 'https://commons.wikimedia.org/w/api.php'
 MAX_ITEMS = 400
 AUTHORS = ['محمدعلی فخارمنش', 'فاطمه ایمانی']

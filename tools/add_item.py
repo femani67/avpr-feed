@@ -9,6 +9,11 @@ item.json fields:
           OWNER RULE: an item about Mahan Air (category 56 or Mahan in the title) may be
           published, but must NEVER be the slider item; the script forces slider off for it,
           so choose a different item for the slider.
+  author:      optional; OWNER RULE: every item carries one of AUTHORS, alternating item by
+               item (the script picks the name not used by the newest item in the feed).
+               Shown as a byline at the end of the text and sent as "author" in feed.json
+               (the WordPress plugin can map it to the post author). A block that is just
+               "<em>تحریریه AVPR</em>" is replaced by the byline.
   short_title: REQUIRED headline of at most 8 words, shown in the homepage slider
                (written by hand, never a cut-off title; no ellipsis),
   blocks: list of strings. A string starting with "<h2", "<ul" or "<ol" is used
@@ -30,6 +35,7 @@ FEED = os.path.join(ROOT, 'feed.json')
 UA = 'AVPR-Feed-Bot/1.0 (https://avpr.ir; femani67@gmail.com)'
 API = 'https://commons.wikimedia.org/w/api.php'
 MAX_ITEMS = 400
+AUTHORS = ['محمدعلی فخارمنش', 'فاطمه ایمانی']
 BAD = re.compile(r'air ?base|air force|navy|naval|military|army|usaf|raf |marine|warship|missile|fighter|bomber|cvn|uss |sailor', re.I)
 
 
@@ -86,6 +92,19 @@ def find_image(query=None, pick=None, exact=None):
     return None
 
 
+def next_author(spec):
+    """Owner rule: alternate the two author names item by item."""
+    if spec.get('author') in AUTHORS:
+        return spec['author']
+    last = None
+    if os.path.exists(FEED):
+        with open(FEED, encoding='utf-8') as f:
+            last = next((i.get('author') for i in json.load(f).get('items', []) if i.get('author')), None)
+    if last in AUTHORS:
+        return AUTHORS[(AUTHORS.index(last) + 1) % len(AUTHORS)]
+    return AUTHORS[0]
+
+
 def block(t):
     t = t.strip()
     if t.startswith('<h2') or t.startswith('<h3'):
@@ -126,7 +145,10 @@ def add(path):
         f.write(get(img['thumb'], binary=True))
 
     credit = f"عکس: {img['artist']} / Wikimedia Commons ({img['license']})"
-    content = '\n\n'.join(block(b) for b in spec['blocks'])
+    author = next_author(spec)
+    byline = '<!-- wp:paragraph -->\n<p class="avpr-author"><em>نویسنده: ' + author + '</em></p>\n<!-- /wp:paragraph -->'
+    blocks = [b for b in spec['blocks'] if not re.fullmatch(r'\s*<em>\s*تحریریه AVPR\s*</em>\s*', b)]
+    content = '\n\n'.join(block(b) for b in blocks) + '\n\n' + byline
     content += ('\n\n<!-- wp:paragraph -->\n<p class="avpr-credit"><small><a href="' + img['page'] +
                 '" target="_blank" rel="noopener">' + credit + '</a></small></p>\n<!-- /wp:paragraph -->')
 
@@ -137,6 +159,7 @@ def add(path):
         slider = False
 
     item = {'id': item_id, 'created': now.isoformat(), 'title': spec['title'], 'excerpt': spec['excerpt'],
+            'author': author,
             'rutitr': spec.get('rutitr', ''), 'short_title': spec['short_title'].strip(), 'slider': slider,
             'categories': spec['categories'], 'focus_keyword': spec.get('focus_keyword', ''),
             'content': content,

@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR Site Kit
  * Description: سفارشی‌سازی‌های avpr.ir که نباید با به‌روزرسانی پوسته پاک شوند: آیکون و شمارندهٔ سبد خرید فروشگاه، تیتر کوتاه اسلایدر، بخش «گفت‌وگو و یادداشت» صفحهٔ اول، پنهان‌سازی کادر نویسنده، فونت فرهنگ برای کل سایت. هر بخش فقط وقتی فعال می‌شود که پوسته خودش آن را نداشته باشد (بعد از به‌روزرسانی پوسته).
- * Version: 1.1.1
+ * Version: 1.1.2
  * Author: AVPR
  * Requires at least: 6.0
  */
@@ -49,7 +49,7 @@ final class AVPR_Site_Kit {
     /* ---------- 4) Farhang typeface + article spacing ---------- */
     static function fonts() {
         if (is_admin()) return;
-        $u = plugins_url('fonts/', __FILE__); $v = '1.1.1';
+        $u = plugins_url('fonts/', __FILE__); $v = '1.1.2';
         $w = ['Thin'=>100,'ExtraLight'=>200,'Light'=>300,'Regular'=>400,'Medium'=>500,'DemiBold'=>600,'Bold'=>700,'ExtraBold'=>800,'Black'=>900];
         echo '<link rel="preload" href="' . esc_url($u . 'Farhang-Regular.woff2?v=' . $v) . '" as="font" type="font/woff2" crossorigin>' . "\n";
         echo '<link rel="preload" href="' . esc_url($u . 'Farhang-Black.woff2?v=' . $v) . '" as="font" type="font/woff2" crossorigin>' . "\n";
@@ -64,8 +64,9 @@ final class AVPR_Site_Kit {
         $css .= "body{font-weight:400}";
         // headings & titles: Black / ExtraBold / Bold
         $css .= "h1,.single h1,.posts_title h1{font-weight:900!important;line-height:1.6!important}";
-        $css .= ".posts_header h3,.posts_header h2,.widget h3,.widget_title,.widget-title{font-weight:800!important}";
+        $css .= ".posts_header h3,.posts_header h2,.widget h3,.widget_title,.widget-title{font-weight:900!important}";
         $css .= "h2,h3,h4,h5,h6,.slider_main h3,.latest_news_inner h5{font-weight:700!important;line-height:1.7!important}";
+        $css .= ".slider_main h3,.latest_news_inner h5,.lastest_news h5,.lastest_news h4,.lastest_news h3{font-weight:900!important}";
         $css .= "strong,b{font-weight:700!important}";
         $css .= "body.single h1{font-size:24px!important;line-height:1.65!important;margin-bottom:12px!important}@media(max-width:767px){body.single h1{font-size:21px!important}}";
         // menus, labels, meta: Medium / Light
@@ -75,9 +76,9 @@ final class AVPR_Site_Kit {
         // article body spacing
         $css .= ".posts_desc{font-size:16px!important;line-height:2.05!important}";
         $css .= ".posts_desc p{font-size:16px!important;line-height:2.05!important;margin:0 0 1.15em!important;font-weight:400!important}";
-        $css .= ".posts_desc h2{font-size:21px!important;font-weight:900!important;line-height:1.7!important;margin:1.9em 0 .6em!important}";
-        $css .= ".posts_desc h3{font-size:18px!important;font-weight:800!important;line-height:1.7!important;margin:1.6em 0 .5em!important}";
-        $css .= ".posts_desc h4{font-size:16.5px!important;font-weight:700!important;margin:1.4em 0 .45em!important}";
+        $css .= ".posts_desc h2{color:#000!important;font-size:21px!important;font-weight:900!important;line-height:1.7!important;margin:1.9em 0 .6em!important}";
+        $css .= ".posts_desc h3{color:#000!important;font-size:18px!important;font-weight:800!important;line-height:1.7!important;margin:1.6em 0 .5em!important}";
+        $css .= ".posts_desc h4{color:#000!important;font-size:16.5px!important;font-weight:700!important;margin:1.4em 0 .45em!important}";
         $css .= ".posts_desc>:first-child{margin-top:0!important}";
         $css .= ".posts_desc ul,.posts_desc ol{margin:0 0 1.15em!important;padding-inline-start:1.4em}.posts_desc li{line-height:2!important;margin-bottom:.35em}";
         $css .= ".posts_desc blockquote{margin:1.4em 0!important;line-height:2!important}";

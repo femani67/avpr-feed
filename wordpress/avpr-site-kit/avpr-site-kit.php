@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR Site Kit
  * Description: سفارشی‌سازی‌های avpr.ir که نباید با به‌روزرسانی پوسته پاک شوند: آیکون و شمارندهٔ سبد خرید فروشگاه، تیتر کوتاه اسلایدر، بخش «گفت‌وگو و یادداشت» صفحهٔ اول، پنهان‌سازی کادر نویسنده، فونت فرهنگ برای کل سایت. هر بخش فقط وقتی فعال می‌شود که پوسته خودش آن را نداشته باشد (بعد از به‌روزرسانی پوسته).
- * Version: 1.1.2
+ * Version: 1.2.0
  * Author: AVPR
  * Requires at least: 6.0
  */
@@ -14,6 +14,7 @@ final class AVPR_Site_Kit {
     private static $slider_post = 0;
 
     static function init() {
+        add_action('wp_head', [__CLASS__, 'verification'], 1);
         add_action('wp_head', [__CLASS__, 'css'], 99);
         add_action('wp_head', [__CLASS__, 'fonts'], 100);
         add_action('wp_footer', [__CLASS__, 'cart'], 20);
@@ -46,10 +47,16 @@ final class AVPR_Site_Kit {
     }
 
 
+    /* ---------- 0) Site-ownership verification meta tags ---------- */
+    static function verification() {
+        if (!is_front_page()) return;
+        echo '<meta name="platform-verification" content="acgmkvfytq" />' . "\n";
+    }
+
     /* ---------- 4) Farhang typeface + article spacing ---------- */
     static function fonts() {
         if (is_admin()) return;
-        $u = plugins_url('fonts/', __FILE__); $v = '1.1.2';
+        $u = plugins_url('fonts/', __FILE__); $v = '1.2.0';
         $w = ['Thin'=>100,'ExtraLight'=>200,'Light'=>300,'Regular'=>400,'Medium'=>500,'DemiBold'=>600,'Bold'=>700,'ExtraBold'=>800,'Black'=>900];
         echo '<link rel="preload" href="' . esc_url($u . 'Farhang-Regular.woff2?v=' . $v) . '" as="font" type="font/woff2" crossorigin>' . "\n";
         echo '<link rel="preload" href="' . esc_url($u . 'Farhang-Black.woff2?v=' . $v) . '" as="font" type="font/woff2" crossorigin>' . "\n";

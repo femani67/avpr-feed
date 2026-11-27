@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR صفحهٔ اول فروشگاه
  * Description: اسلایدر قابل مدیریت صفحهٔ اول فروشگاه (منوی «اسلایدهای فروشگاه»)، و نمایش جداگانهٔ قیمت هر نوع نسخه (مثلاً PDF و چاپی) به‌جای بازهٔ قیمت.
- * Version: 1.0.1
+ * Version: 1.0.2
  * Author: AVPR
  */
 if (!defined('ABSPATH')) exit;
@@ -91,3 +91,7 @@ add_filter('woocommerce_variable_price_html', function ($html, $product) {
 add_action('wp_head', function () {
 	echo '<style>.avpr-eds{display:inline-flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;justify-content:center}.avpr-ed-l{font-size:.85em;color:#555;font-weight:500}.avpr-ed-sep{color:#bbb}</style>';
 });
+
+/* ---------- Branded sender for WordPress system emails (password reset, new account) ---------- */
+add_filter('wp_mail_from_name', function ($n) { return ($n === 'WordPress' || $n === '') ? 'فروشگاه AVPR' : $n; });
+add_filter('wp_mail_from', function ($e) { return (strpos($e, 'wordpress@') === 0) ? 'info@avpr.ir' : $e; });

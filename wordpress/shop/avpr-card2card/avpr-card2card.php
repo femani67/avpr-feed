@@ -2,13 +2,13 @@
 /**
  * Plugin Name: AVPR کارت به کارت
  * Description: پرداخت کارت به کارت برای ووکامرس: نمایش شماره کارت به مشتری، فرم ارسال رسید (شماره پیگیری، ۴ رقم آخر کارت، مبلغ، تاریخ، تصویر رسید)، بررسی خودکار رسید و تطبیق با پیامک واریز بانک، و تایید یک‌کلیکی سفارش.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: AVPR
  * Requires Plugins: woocommerce
  */
 if (!defined('ABSPATH')) exit;
 
-define('AVPR_C2C_VER', '1.0.0');
+define('AVPR_C2C_VER', '1.0.1');
 
 /* ================= helpers ================= */
 function avpr_c2c_en($s) { return strtr((string)$s, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٬'=>',','،'=>',']); }
@@ -194,13 +194,13 @@ function avpr_c2c_parse_sms($text) {
 	$amount = 0;
 	if (preg_match('/(?:واریز|\+|مبلغ)\D{0,15}([\d,]{4,})/u', $t, $mm)) $amount = (int) preg_replace('/\D/', '', $mm[1]);
 	if (!$amount) $amount = $nums[0];
-	$isToman = (bool) preg_match('/تومان/u', $t) && !preg_match('/ریال/u', $t);
-	return ['rial' => $isToman ? $amount * 10 : $amount, 'deposit' => $deposit];
+	$unit = preg_match('/ریال/u', $t) ? 'rial' : (preg_match('/تومان/u', $t) ? 'toman' : 'unknown');
+	return ['rial' => $unit === 'toman' ? $amount * 10 : $amount, 'deposit' => $deposit, 'unit' => $unit];
 }
 function avpr_c2c_store_sms($text, $source = 'api') {
 	$p = avpr_c2c_parse_sms($text);
 	$list = get_option('avpr_c2c_sms', []);
-	$list[] = ['t' => time(), 'text' => mb_substr(wp_strip_all_tags($text), 0, 500), 'rial' => $p['rial'] ?? 0, 'deposit' => $p['deposit'] ?? false, 'used' => 0, 'src' => $source];
+	$list[] = ['t' => time(), 'text' => mb_substr(wp_strip_all_tags($text), 0, 500), 'rial' => $p['rial'] ?? 0, 'deposit' => $p['deposit'] ?? false, 'unit' => $p['unit'] ?? 'unknown', 'used' => 0, 'src' => $source];
 	$list = array_slice($list, -300);
 	update_option('avpr_c2c_sms', $list, false);
 	// try to match every waiting order
@@ -216,7 +216,8 @@ function avpr_c2c_try_sms_match($order) {
 	$created = $order->get_date_created() ? $order->get_date_created()->getTimestamp() : 0;
 	$list = get_option('avpr_c2c_sms', []);
 	foreach ($list as $i => $s) {
-		if ($s['used'] || !$s['deposit'] || (int) $s['rial'] !== $need) continue;
+		$amt_ok = (int) $s['rial'] === $need || (($s['unit'] ?? 'unknown') === 'unknown' && (int) $s['rial'] * 10 === $need);
+		if ($s['used'] || !$s['deposit'] || !$amt_ok) continue;
 		if ($s['t'] < $created - 600 || $s['t'] > $created + 7 * DAY_IN_SECONDS) continue;
 		$list[$i]['used'] = $order->get_id();
 		update_option('avpr_c2c_sms', $list, false);

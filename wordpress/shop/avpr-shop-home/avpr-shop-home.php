@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR صفحهٔ اول فروشگاه
  * Description: اسلایدر قابل مدیریت صفحهٔ اول فروشگاه (منوی «اسلایدهای فروشگاه»)، و نمایش جداگانهٔ قیمت هر نوع نسخه (مثلاً PDF و چاپی) به‌جای بازهٔ قیمت.
- * Version: 1.0.0
+ * Version: 1.0.1
  * Author: AVPR
  */
 if (!defined('ABSPATH')) exit;
@@ -12,7 +12,7 @@ add_action('init', function () {
 	register_post_type('avpr_slide', [
 		'labels' => ['name' => 'اسلایدهای فروشگاه', 'singular_name' => 'اسلاید', 'add_new' => 'افزودن اسلاید', 'add_new_item' => 'افزودن اسلاید تازه', 'edit_item' => 'ویرایش اسلاید', 'all_items' => 'همهٔ اسلایدها', 'featured_image' => 'تصویر اسلاید', 'set_featured_image' => 'انتخاب تصویر اسلاید'],
 		'public' => false, 'show_ui' => true, 'show_in_menu' => true, 'menu_position' => 56, 'menu_icon' => 'dashicons-images-alt2',
-		'supports' => ['title', 'excerpt', 'thumbnail', 'page-attributes'], 'show_in_rest' => true,
+		'supports' => ['title', 'excerpt', 'thumbnail', 'page-attributes', 'custom-fields'], 'show_in_rest' => true,
 	]);
 	foreach (['_avpr_slide_link', '_avpr_slide_button', '_avpr_slide_badge', '_avpr_slide_bg'] as $k)
 		register_post_meta('avpr_slide', $k, ['type' => 'string', 'single' => true, 'show_in_rest' => true, 'auth_callback' => function () { return current_user_can('edit_posts'); }]);
@@ -66,7 +66,7 @@ add_shortcode('avpr_slider', function () {
 	.avpr-sl h2{font-size:34px;line-height:1.5;color:#1c1a5e;margin:12px 0}.avpr-sl p{font-size:17px;line-height:2;color:#4a4f60}
 	.avpr-sl .b{display:inline-block;background:#c8102e;color:#fff;border-radius:8px;padding:3px 12px;font-size:13px;font-weight:700}
 	.avpr-sl .btn{display:inline-block;margin-top:14px;background:#1c1a8e;color:#fff!important;border-radius:12px;padding:12px 28px;font-weight:700}
-	.avpr-sl-dots{display:flex;gap:8px;justify-content:center;margin-top:14px}.avpr-sl-dots button{width:10px;height:10px;border-radius:50%;border:0;background:#c9c9d8;padding:0}.avpr-sl-dots button.on{background:#1c1a8e;width:26px;border-radius:6px}
+	.avpr-sl-dots{display:flex;gap:8px;justify-content:center;margin-top:14px}.avpr-sl-dots button{width:10px!important;height:10px!important;min-height:0!important;line-height:0!important;border-radius:50%!important;border:0!important;background:#c9c9d8!important;padding:0!important}.avpr-sl-dots button.on{background:#1c1a8e!important;width:26px!important;border-radius:6px!important}
 	@media(max-width:767px){.avpr-sl-item.on{flex-direction:column-reverse;padding:24px;min-height:0}.avpr-sl h2{font-size:24px}}
 	</style>
 	<script>(function(){var r=document.currentScript.previousElementSibling.previousElementSibling;if(!r||!r.classList.contains('avpr-sl'))r=document.querySelector('.avpr-sl');var it=r.querySelectorAll('.avpr-sl-item'),dt=r.querySelectorAll('.avpr-sl-dots button'),c=0,t;function go(n){it[c].classList.remove('on');dt[c]&&dt[c].classList.remove('on');c=(n+it.length)%it.length;it[c].classList.add('on');dt[c]&&dt[c].classList.add('on')}function auto(){clearInterval(t);t=setInterval(function(){go(c+1)},6000)}dt.forEach(function(b,i){b.onclick=function(){go(i);auto()}});if(it.length>1)auto()})();</script>

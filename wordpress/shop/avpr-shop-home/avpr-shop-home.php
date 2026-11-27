@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR صفحهٔ اول فروشگاه
  * Description: اسلایدر قابل مدیریت صفحهٔ اول فروشگاه (منوی «اسلایدهای فروشگاه»)، و نمایش جداگانهٔ قیمت هر نوع نسخه (مثلاً PDF و چاپی) به‌جای بازهٔ قیمت.
- * Version: 1.0.2
+ * Version: 1.1.0
  * Author: AVPR
  */
 if (!defined('ABSPATH')) exit;
@@ -95,3 +95,22 @@ add_action('wp_head', function () {
 /* ---------- Branded sender for WordPress system emails (password reset, new account) ---------- */
 add_filter('wp_mail_from_name', function ($n) { return ($n === 'WordPress' || $n === '') ? 'فروشگاه AVPR' : $n; });
 add_filter('wp_mail_from', function ($e) { return (strpos($e, 'wordpress@') === 0) ? 'info@avpr.ir' : $e; });
+
+/* ---------- Digital-only cart: no address fields at checkout ---------- */
+add_filter('woocommerce_checkout_fields', function ($f) {
+	if (function_exists('WC') && WC()->cart && !WC()->cart->is_empty() && !WC()->cart->needs_shipping()) {
+		foreach (['billing_company', 'billing_country', 'billing_address_1', 'billing_address_2', 'billing_city', 'billing_state', 'billing_postcode'] as $k) unset($f['billing'][$k]);
+		if (isset($f['order']['order_comments'])) $f['order']['order_comments']['required'] = false;
+	}
+	return $f;
+}, 20);
+
+/* ---------- Simpler registration: email + password only ---------- */
+add_filter('woocommerce_registration_error_email_exists', function () {
+	return 'با این ایمیل قبلاً حساب ساخته شده است. لطفاً وارد شوید (اگر رمز را فراموش کرده‌اید، «فراموشی رمز» را بزنید).';
+});
+add_filter('woocommerce_min_password_strength', function () { return 1; });
+add_filter('woocommerce_get_script_data', function ($data, $handle) {
+	if ($handle === 'wc-password-strength-meter' && is_array($data)) { $data['min_password_strength'] = 1; $data['i18n_password_hint'] = 'رمز دست‌کم ۶ نویسه باشد.'; }
+	return $data;
+}, 10, 2);

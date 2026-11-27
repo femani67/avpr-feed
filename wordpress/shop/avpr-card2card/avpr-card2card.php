@@ -2,13 +2,13 @@
 /**
  * Plugin Name: AVPR کارت به کارت
  * Description: پرداخت کارت به کارت برای ووکامرس: نمایش شماره کارت به مشتری، فرم ارسال رسید (شماره پیگیری، ۴ رقم آخر کارت، مبلغ، تاریخ، تصویر رسید)، بررسی خودکار رسید و تطبیق با پیامک واریز بانک، و تایید یک‌کلیکی سفارش.
- * Version: 1.0.1
+ * Version: 1.1.0
  * Author: AVPR
  * Requires Plugins: woocommerce
  */
 if (!defined('ABSPATH')) exit;
 
-define('AVPR_C2C_VER', '1.0.1');
+define('AVPR_C2C_VER', '1.1.0');
 
 /* ================= helpers ================= */
 function avpr_c2c_en($s) { return strtr((string)$s, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٬'=>',','،'=>',']); }
@@ -50,6 +50,8 @@ add_action('plugins_loaded', function () {
 				'sheba' => ['title' => 'شماره شبا (اختیاری)', 'type' => 'text', 'default' => ''],
 				'phone' => ['title' => 'شمارهٔ تماس برای هماهنگی پرداخت', 'type' => 'text', 'default' => ''],
 				'sms_token' => ['title' => 'کلید دریافت پیامک بانک', 'type' => 'text', 'description' => 'برای تطبیق خودکار با پیامک واریز. آدرس دریافت: <code>' . esc_html(rest_url('avpr-c2c/v1/sms')) . '?token=این‌کلید</code>', 'default' => wp_generate_password(24, false)],
+				'notify_emails' => ['title' => 'ایمیل‌های اطلاع‌رسانی به مدیر', 'type' => 'text', 'description' => 'هر سفارش و هر رسید تازه به این ایمیل‌ها هم فرستاده می‌شود (با کاما جدا کنید).', 'default' => 'mfakharmanesh@gmail.com'],
+				'instant_digital' => ['title' => 'تحویل فوری فایل', 'type' => 'checkbox', 'label' => 'اگر سفارش فقط فایل دانلودی است و رسید ثبت‌شده درست است (مبلغ درست، شماره پیگیری تکراری نیست، تصویر رسید دارد)، لینک دانلود همان لحظه فعال شود؛ تطبیق با پیامک بانک بعداً انجام می‌شود', 'default' => 'yes'],
 				'auto_confirm' => ['title' => 'تایید خودکار', 'type' => 'checkbox', 'label' => 'اگر رسید با یک پیامک واریز بانک (همان مبلغ، بعد از زمان سفارش) جور شد، سفارش خودکار تایید شود', 'default' => 'yes'],
 			];
 		}
@@ -151,12 +153,35 @@ add_action('template_redirect', function () {
 	$order->update_meta_data('_avpr_c2c_checks', $checks);
 	$order->save();
 	$order->add_order_note('رسید کارت به کارت ثبت شد: پیگیری ' . $r['ref'] . '، کارت ****' . $r['last4'] . '، مبلغ ' . number_format($r['amount_toman']) . ' تومان. ' . avpr_c2c_checks_text($checks));
-	avpr_c2c_try_sms_match($order);
-	// notify admin
-	$admin = get_option('admin_email');
-	wp_mail($admin, 'رسید کارت به کارت برای سفارش #' . $order->get_order_number(), 'مشتری رسید پرداخت را ثبت کرد. ' . avpr_c2c_checks_text($checks) . "\n\n" . admin_url('post.php?post=' . $oid . '&action=edit'));
+	$matched = avpr_c2c_try_sms_match($order);
+	$order = wc_get_order($oid);
+	$ok = $checks['amount'] === 'ok' && $checks['dup'] === 'ok' && $checks['file'] === 'ok';
+	if (!$matched && $ok && $order->has_status('on-hold') && avpr_c2c_opt('instant_digital', 'yes') === 'yes' && avpr_c2c_only_digital($order)) {
+		$order->update_meta_data('_avpr_c2c_provisional', 1); $order->save();
+		$order->update_status('processing', 'تایید موقت بر اساس رسید (سفارش فایل): لینک دانلود فعال شد. پیامک واریز بانک هنوز تطبیق داده نشده؛ واریز را در حساب بررسی کنید.');
+	}
+	$state = $order->has_status('processing') ? ($order->get_meta('_avpr_c2c_provisional') ? 'تایید موقت (فایل تحویل شد؛ واریز را در حساب بررسی کنید)' : 'تایید شد') : 'در انتظار تایید شما';
+	wp_mail(avpr_c2c_admin_emails(), 'رسید کارت به کارت — سفارش #' . $order->get_order_number() . ' — ' . $state,
+		'مشتری رسید پرداخت را ثبت کرد.' . "\n\nوضعیت: " . $state . "\nبررسی خودکار: " . avpr_c2c_checks_text($checks) . "\nشماره پیگیری: " . $r['ref'] . ' | کارت ****' . $r['last4'] . ' | ' . number_format($r['amount_toman']) . " تومان\n\nمدیریت سفارش:\n" . $order->get_edit_order_url());
 	wc_add_notice('رسید شما ثبت شد. پس از تایید، سفارش ارسال می‌شود.', 'success');
 	wp_safe_redirect(add_query_arg([], wp_get_referer() ?: $order->get_view_order_url())); exit;
+});
+
+function avpr_c2c_admin_emails() {
+	$list = array_filter(array_map('trim', explode(',', (string) avpr_c2c_opt('notify_emails', 'mfakharmanesh@gmail.com'))));
+	$list[] = get_option('admin_email');
+	return array_values(array_unique(array_filter($list, 'is_email')));
+}
+function avpr_c2c_only_digital($order) {
+	foreach ($order->get_items() as $it) { $p = $it->get_product(); if (!$p || !($p->is_downloadable() || $p->is_virtual())) return false; }
+	return count($order->get_items()) > 0;
+}
+/* new c2c order → notify admins */
+add_action('woocommerce_order_status_pending_to_on-hold', function ($id) {
+	$o = wc_get_order($id); if (!$o || $o->get_payment_method() !== 'avpr_c2c') return;
+	$lines = []; foreach ($o->get_items() as $it) $lines[] = '- ' . $it->get_name() . ' × ' . $it->get_quantity();
+	wp_mail(avpr_c2c_admin_emails(), 'سفارش تازه #' . $o->get_order_number() . ' — فروشگاه AVPR',
+		"سفارش تازه با پرداخت کارت به کارت ثبت شد.\n\nمشتری: " . $o->get_formatted_billing_full_name() . ' — ' . $o->get_billing_phone() . ' — ' . $o->get_billing_email() . "\nمبلغ: " . number_format((float) $o->get_total()) . " تومان\n" . implode("\n", $lines) . "\n\nمدیریت سفارش:\n" . $o->get_edit_order_url());
 });
 
 /* ================= automatic checks ================= */
@@ -165,8 +190,11 @@ function avpr_c2c_check($order, $r) {
 	$need = (int) round(avpr_c2c_order_rial($order) / 10);
 	$c['amount'] = ($r['amount_toman'] === $need) ? 'ok' : ($r['amount_toman'] > $need ? 'more' : 'less');
 	// duplicate tracking number on other orders
-	$dup = wc_get_orders(['limit' => 1, 'exclude' => [$order->get_id()], 'meta_query' => [['key' => '_avpr_c2c_ref', 'value' => $r['ref']]], 'return' => 'ids']);
-	$c['dup'] = $dup ? 'dup:' . $dup[0] : 'ok';
+	$dup = 0;
+	foreach (wc_get_orders(['limit' => 300, 'payment_method' => 'avpr_c2c', 'exclude' => [$order->get_id()]]) as $o2) {
+		if ((string) $o2->get_meta('_avpr_c2c_ref') === (string) $r['ref']) { $dup = $o2->get_id(); break; }
+	}
+	$c['dup'] = $dup ? 'dup:' . $dup : 'ok';
 	$order->update_meta_data('_avpr_c2c_ref', $r['ref']);
 	$c['ref_len'] = (strlen($r['ref']) >= 6) ? 'ok' : 'short';
 	$c['file'] = $r['file'] ? 'ok' : 'none';
@@ -204,7 +232,7 @@ function avpr_c2c_store_sms($text, $source = 'api') {
 	$list = array_slice($list, -300);
 	update_option('avpr_c2c_sms', $list, false);
 	// try to match every waiting order
-	$orders = wc_get_orders(['status' => ['on-hold'], 'payment_method' => 'avpr_c2c', 'limit' => 50]);
+	$orders = wc_get_orders(['status' => ['on-hold', 'processing'], 'payment_method' => 'avpr_c2c', 'limit' => 80]);
 	foreach ($orders as $o) avpr_c2c_try_sms_match($o);
 	return $p;
 }
@@ -226,8 +254,9 @@ function avpr_c2c_try_sms_match($order) {
 		$order->update_meta_data('_avpr_c2c_sms', $s);
 		$order->save();
 		$order->add_order_note('پیامک واریز بانک با این سفارش جور شد (' . number_format($s['rial']) . ' ریال، ' . wp_date('Y-m-d H:i', $s['t']) . ').');
+		if ($order->get_meta('_avpr_c2c_provisional')) { $order->delete_meta_data('_avpr_c2c_provisional'); $order->save(); $order->add_order_note('تایید موقت قطعی شد: واریز با پیامک بانک تأیید شد.'); return true; }
 		$ok = ($checks['amount'] ?? '') === 'ok' && ($checks['dup'] ?? '') === 'ok';
-		if ($ok && avpr_c2c_opt('auto_confirm', 'yes') === 'yes') {
+		if ($ok && $order->has_status('on-hold') && avpr_c2c_opt('auto_confirm', 'yes') === 'yes') {
 			$order->update_status('processing', 'پرداخت کارت به کارت به‌صورت خودکار تایید شد (رسید + پیامک بانک).');
 		}
 		return true;
@@ -240,9 +269,13 @@ add_action('rest_api_init', function () {
 		'permission_callback' => '__return_true',
 		'callback' => function (WP_REST_Request $req) {
 			$token = avpr_c2c_opt('sms_token');
-			if (!$token || !hash_equals($token, (string) $req->get_param('token'))) return new WP_REST_Response(['ok' => false], 403);
 			$text = (string) ($req->get_param('text') ?? $req->get_param('message') ?? $req->get_param('msg') ?? $req->get_param('body') ?? '');
 			if ($text === '') { $j = $req->get_json_params(); $text = (string) ($j['text'] ?? $j['message'] ?? $j['body'] ?? ''); }
+			if ($text === '') { $raw = (string) $req->get_body(); if ($raw !== '' && strpos($raw, '=') === false) $text = $raw; }
+			$tok_ok = $token && hash_equals($token, (string) $req->get_param('token'));
+			$hits = get_option('avpr_c2c_hits', []); $hits[] = ['t' => time(), 'method' => $req->get_method(), 'token' => $tok_ok ? 'ok' : 'wrong', 'len' => mb_strlen($text), 'ct' => (string) $req->get_header('content_type'), 'keys' => implode(',', array_keys((array) $req->get_params()))];
+			update_option('avpr_c2c_hits', array_slice($hits, -20), false);
+			if (!$tok_ok) return new WP_REST_Response(['ok' => false], 403);
 			if ($text === '') return new WP_REST_Response(['ok' => false, 'error' => 'empty'], 400);
 			$p = avpr_c2c_store_sms($text, 'api');
 			return ['ok' => true, 'parsed' => $p];
@@ -306,6 +339,9 @@ add_action('admin_menu', function () {
 		echo '<p><code dir="ltr">' . esc_html(rest_url('avpr-c2c/v1/sms') . '?token=' . avpr_c2c_opt('sms_token')) . '</code></p>';
 		echo '<form method="post">'; wp_nonce_field('avpr_c2c_sms');
 		echo '<textarea name="avpr_sms_text" rows="5" style="width:100%;max-width:640px"></textarea><p><button class="button button-primary">ثبت و تطبیق</button></p></form>';
+		echo '<h2>آخرین درخواست‌های رسیده از گوشی (برای عیب‌یابی شورتکات)</h2><table class="widefat striped"><thead><tr><th>زمان</th><th>روش</th><th>کلید</th><th>طول متن</th><th>نوع</th><th>فیلدها</th></tr></thead><tbody>';
+		foreach (array_reverse(get_option('avpr_c2c_hits', [])) as $x) echo '<tr><td>' . esc_html(wp_date('Y-m-d H:i:s', $x['t'])) . '</td><td>' . esc_html($x['method']) . '</td><td>' . esc_html($x['token']) . '</td><td>' . (int) $x['len'] . '</td><td>' . esc_html($x['ct']) . '</td><td>' . esc_html($x['keys']) . '</td></tr>';
+		echo '</tbody></table>';
 		echo '<h2>آخرین پیامک‌ها</h2><table class="widefat striped"><thead><tr><th>زمان</th><th>مبلغ (ریال)</th><th>نوع</th><th>سفارش</th><th>متن</th></tr></thead><tbody>';
 		foreach (array_reverse(get_option('avpr_c2c_sms', [])) as $s) {
 			echo '<tr><td>' . esc_html(wp_date('Y-m-d H:i', $s['t'])) . '</td><td>' . esc_html(number_format($s['rial'])) . '</td><td>' . ($s['deposit'] ? 'واریز' : '—') . '</td><td>' . ($s['used'] ? '<a href="' . esc_url(admin_url('post.php?post=' . $s['used'] . '&action=edit')) . '">#' . (int) $s['used'] . '</a>' : '') . '</td><td style="max-width:420px">' . esc_html($s['text']) . '</td></tr>';

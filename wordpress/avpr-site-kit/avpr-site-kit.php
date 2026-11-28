@@ -23,6 +23,8 @@ final class AVPR_Site_Kit {
         add_filter('the_title', [__CLASS__, 'slider_title'], 20, 2);
         add_action('wp_footer', [__CLASS__, 'social'], 22);
         add_action('wp_head', [__CLASS__, 'ads_css'], 101);
+        add_action('after_setup_theme', function () { register_nav_menus(['avpr_useful' => 'فوتر: پیوندهای مفید (AVPR)']); }, 20);
+        add_action('wp_footer', [__CLASS__, 'footer_layout'], 5);
         add_action('admin_init', [__CLASS__, 'settings']);
         add_shortcode('avpr_admin_contact', [__CLASS__, 'sc_admin']);
     }
@@ -101,7 +103,7 @@ if(document.readyState!=='loading')run();else document.addEventListener('DOMCont
         echo "<style id=\"avpr-kit-css\">.author_box{display:none!important}"
            . ".avpr-cart{position:relative}.avpr-cart-count{position:absolute;top:-6px;left:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#e31e24;color:#fff;font-size:11px;font-weight:700;line-height:19px;text-align:center;box-shadow:0 0 0 2px #fff;display:none}.avpr-cart-count.on{display:block}"
            . ".avpr-admin-btns{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px}.avpr-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:12px;color:#fff!important;text-decoration:none!important;font-weight:700!important;font-size:15px;line-height:1.4;transition:background-color .2s}.avpr-btn:hover,.avpr-btn:focus-visible{transform:none;box-shadow:none}.avpr-btn i{font-size:18px}.avpr-btn.bale{background:#1fb68c}.avpr-btn.bale:hover{background:#15936f}.avpr-btn.tg{background:#229ed9}.avpr-btn.tg:hover{background:#1a7fb0}.avpr-btn[style]:hover{filter:brightness(.88)}"
-           . "footer .social{display:flex;flex-direction:column;align-items:flex-end;text-align:left}footer .social .body{justify-content:flex-end}footer .social .enamad{margin-top:16px}footer .social .enamad img{display:block}.avpr-enamad-fb{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:7px 13px;color:#fff!important;font-size:13.5px;text-decoration:none!important;transition:background-color .2s}.avpr-enamad-fb:hover{background:rgba(255,255,255,.1)}.avpr-enamad-fb i{color:#4cc38a;font-size:16px}.avpr-foot-admin{margin-top:16px;display:flex;flex-direction:column;align-items:flex-end}.avpr-foot-admin .avpr-admin-btns{justify-content:flex-end}.avpr-foot-admin>span{display:block;margin-bottom:8px;opacity:.85;font-size:14px}.avpr-foot-admin .avpr-admin-btns{margin:0}.avpr-foot-admin .avpr-btn{padding:8px 14px;font-size:13.5px;border-radius:10px}"
+           . ".avpr-enamad-fb{display:inline-flex;align-items:center;gap:7px;border:1px solid rgba(255,255,255,.35);border-radius:10px;padding:7px 13px;color:#fff!important;font-size:13.5px;text-decoration:none!important;transition:background-color .2s}.avpr-enamad-fb:hover{background:rgba(255,255,255,.1)}.avpr-enamad-fb i{color:#4cc38a;font-size:16px}.avpr-foot-admin{margin-top:22px}.avpr-foot-admin>span{display:block;margin-bottom:8px;opacity:.85;font-size:14px}.avpr-foot-admin .avpr-admin-btns{margin:0}.avpr-foot-admin .avpr-btn{padding:8px 14px;font-size:13.5px;border-radius:10px}"
            . "</style>\n";
     }
 
@@ -131,6 +133,61 @@ if(document.readyState!=='loading')run();else document.addEventListener('DOMCont
         . '.ads-print{display:grid;grid-template-columns:1fr 1.3fr;gap:20px;align-items:center}.ads-print img{width:100%;border-radius:16px}'
         . '@media(max-width:767px){.ads-hero{grid-template-columns:1fr;padding:24px 20px 0}.ads-hero h1{font-size:24px!important}.ads-grid,.ads-print{grid-template-columns:1fr}.ads-steps{grid-template-columns:1fr 1fr}}'
         . '</style>' . "\n";
+    }
+
+
+    /* ---------- 7) Footer layout: about+enamad | quick access | useful links | social+admin ---------- */
+    static $useful = [
+        ['سازمان هواپیمایی کشوری', 'https://www.cao.ir'],
+        ['شرکت فرودگاه‌ها و ناوبری هوایی ایران', 'https://www.airport.ir'],
+        ['انجمن شرکت‌های هواپیمایی ایران', 'https://aira.ir'],
+        ['ایکائو (ICAO)', 'https://www.icao.int'],
+        ['یاتا (IATA)', 'https://www.iata.org'],
+        ['انجمن روابط عمومی ایران', 'https://irprs.com'],
+        ['انجمن بین‌المللی روابط عمومی (IPRA)', 'https://www.ipra.org'],
+    ];
+    static function footer_layout() {
+        if (is_admin()) return;
+        $links = '';
+        $loc = get_nav_menu_locations();
+        if (!empty($loc['avpr_useful'])) {
+            $links = wp_nav_menu(['menu' => $loc['avpr_useful'], 'container' => '', 'menu_class' => '', 'echo' => false, 'depth' => 1, 'fallback_cb' => false]);
+        }
+        if (!$links) {
+            $links = '<ul>';
+            foreach (self::$useful as $l) $links .= '<li><a href="' . esc_url($l[1]) . '">' . esc_html($l[0]) . '</a></li>';
+            $links .= '</ul>';
+        }
+        ?>
+<style id="avpr-kit-footer">
+footer.footer .avpr-frow{row-gap:34px;padding-bottom:6px}
+footer.footer .avpr-frow .footer_title{margin-bottom:18px}
+footer.footer .avpr-frow .aboutUs p{margin-bottom:0}
+footer.footer .avpr-frow .enamad{margin-top:22px!important}
+footer.footer .avpr-frow .enamad img{display:block;max-height:110px;width:auto}
+footer.footer .avpr-frow .access ul{margin:0;padding:0}
+footer.footer .avpr-frow .access li{margin-bottom:10px;line-height:1.7}
+footer.footer .avpr-useful a{display:inline-flex;align-items:center;gap:6px}
+footer.footer .avpr-useful a:after{content:"↖";font-size:12px;opacity:.5}
+footer.footer .avpr-frow .social .body{margin-top:14px}
+footer.footer .avpr-foot-admin>span{font-size:14px;opacity:.85}
+footer.footer .avpr-foot-admin .avpr-btn{padding:8px 14px;font-size:13.5px}
+@media(min-width:992px){footer.footer .avpr-frow>div{padding-inline:18px}footer.footer .avpr-frow>div+div{border-inline-start:1px solid rgba(255,255,255,.08)}}
+</style>
+<template id="avpr-kit-useful"><div class="access avpr-useful"><div class="footer_title">پیوندهای مفید</div><div class="body"><?php echo $links; ?></div></div></template>
+<script id="avpr-kit-footer-js">(function(){
+var f=document.querySelector('footer.footer');if(!f)return;var row=f.querySelector('.container>.row');if(!row||row.classList.contains('avpr-frow'))return;
+var about=row.querySelector('.aboutUs'),access=row.querySelector('.access'),social=row.querySelector('.social');if(!about||!access||!social)return;
+var en=social.querySelector('.enamad');
+function col(cls,node){var d=document.createElement('div');d.className=cls;if(node)d.appendChild(node);return d;}
+var c1=col('col-lg-4 col-md-12',about);if(en)about.appendChild(en);
+var c2=col('col-lg-2 col-md-4 col-6',access);
+var c3=col('col-lg-3 col-md-4 col-6');c3.appendChild(document.getElementById('avpr-kit-useful').content.cloneNode(true));
+var c4=col('col-lg-3 col-md-4',social);
+c3.querySelectorAll('a').forEach(function(a){a.target='_blank';a.rel='noopener'});
+row.innerHTML='';row.classList.add('avpr-frow');[c1,c2,c3,c4].forEach(function(c){row.appendChild(c)});
+})();</script>
+        <?php
     }
 
     /* ---------- 0) Site-ownership verification meta tags ---------- */

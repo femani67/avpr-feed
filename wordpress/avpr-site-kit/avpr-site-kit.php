@@ -164,7 +164,7 @@ footer.footer .avpr-frow{row-gap:34px;padding-bottom:6px}
 footer.footer .avpr-frow .footer_title{margin-bottom:18px}
 footer.footer .avpr-frow .aboutUs p{margin-bottom:0}
 footer.footer .avpr-frow .enamad{margin-top:22px!important}
-footer.footer .avpr-frow .enamad img{display:block;max-height:110px;width:auto}
+footer.footer .avpr-frow .enamad img{display:block;height:160px!important;width:auto!important;max-height:none!important}@media(max-width:991px){footer.footer .avpr-frow .enamad img{height:130px!important}}
 footer.footer .avpr-frow .access ul{margin:0;padding:0}
 footer.footer .avpr-frow .access li{display:block!important;width:auto!important;float:none!important;margin:0 0 11px!important;line-height:1.7}
 footer.footer .avpr-useful a:after{content:"↖";font-size:12px;opacity:.5;margin-inline-start:6px;display:inline-block}

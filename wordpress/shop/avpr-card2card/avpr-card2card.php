@@ -2,13 +2,13 @@
 /**
  * Plugin Name: AVPR کارت به کارت
  * Description: پرداخت کارت به کارت برای ووکامرس: نمایش شماره کارت به مشتری، فرم ارسال رسید (شماره پیگیری، ۴ رقم آخر کارت، مبلغ، تاریخ، تصویر رسید)، بررسی خودکار رسید و تطبیق با پیامک واریز بانک، و تایید یک‌کلیکی سفارش.
- * Version: 1.2.0
+ * Version: 1.3.0
  * Author: AVPR
  * Requires Plugins: woocommerce
  */
 if (!defined('ABSPATH')) exit;
 
-define('AVPR_C2C_VER', '1.2.0');
+define('AVPR_C2C_VER', '1.3.0');
 
 /* ================= helpers ================= */
 function avpr_c2c_en($s) { return strtr((string)$s, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٬'=>',','،'=>',']); }
@@ -180,6 +180,8 @@ function avpr_c2c_mail_later($to, $subject, $body) {
 	}
 	$q[] = [$to, $subject, $body];
 }
+/** digital-only orders are finished once paid; physical ones still need shipping */
+function avpr_c2c_final_status($order) { return avpr_c2c_only_digital($order) ? 'completed' : 'processing'; }
 function avpr_c2c_admin_emails() {
 	$list = array_filter(array_map('trim', explode(',', (string) avpr_c2c_opt('notify_emails', 'mfakharmanesh@gmail.com'))));
 	$list[] = get_option('admin_email');
@@ -253,6 +255,8 @@ function avpr_c2c_try_sms_match($order) {
 	$r = $order->get_meta('_avpr_c2c_receipt'); if (!$r) return false;
 	$checks = $order->get_meta('_avpr_c2c_checks') ?: [];
 	if (($checks['sms'] ?? '') === 'matched') return true;
+	// orders already confirmed by hand (not provisional) must not consume a new SMS
+	if (!$order->has_status('on-hold') && !$order->get_meta('_avpr_c2c_provisional')) return false;
 	$need = avpr_c2c_order_rial($order);
 	$created = $order->get_date_created() ? $order->get_date_created()->getTimestamp() : 0;
 	$list = get_option('avpr_c2c_sms', []);
@@ -267,10 +271,16 @@ function avpr_c2c_try_sms_match($order) {
 		$order->update_meta_data('_avpr_c2c_sms', $s);
 		$order->save();
 		$order->add_order_note('پیامک واریز بانک با این سفارش جور شد (' . number_format($s['rial']) . ' ریال، ' . wp_date('Y-m-d H:i', $s['t']) . ').');
-		if ($order->get_meta('_avpr_c2c_provisional')) { $order->delete_meta_data('_avpr_c2c_provisional'); $order->save(); $order->add_order_note('تایید موقت قطعی شد: واریز با پیامک بانک تأیید شد.'); return true; }
+		if ($order->get_meta('_avpr_c2c_provisional')) {
+			$order->delete_meta_data('_avpr_c2c_provisional'); $order->save();
+			$fs = avpr_c2c_final_status($order);
+			if ($fs === 'completed') $order->update_status('completed', 'واریز با پیامک بانک تأیید شد؛ سفارش فایل تکمیل شد.');
+			else $order->add_order_note('تایید موقت قطعی شد: واریز با پیامک بانک تأیید شد.');
+			return true;
+		}
 		$ok = ($checks['amount'] ?? '') === 'ok' && ($checks['dup'] ?? '') === 'ok';
 		if ($ok && $order->has_status('on-hold') && avpr_c2c_opt('auto_confirm', 'yes') === 'yes') {
-			$order->update_status('processing', 'پرداخت کارت به کارت به‌صورت خودکار تایید شد (رسید + پیامک بانک).');
+			$order->update_status(avpr_c2c_final_status($order), 'پرداخت کارت به کارت به‌صورت خودکار تایید شد (رسید + پیامک بانک).');
 		}
 		return true;
 	}
@@ -312,7 +322,8 @@ function avpr_c2c_admin_box($post_or_order) {
 		echo '<p style="line-height:1.9">' . str_replace(' | ', '<br>', esc_html(avpr_c2c_checks_text($c))) . '</p>';
 		if ($r['file']) echo '<p><a class="button" target="_blank" href="' . esc_url(wp_nonce_url(admin_url('admin-post.php?action=avpr_c2c_file&order=' . $order->get_id()), 'avpr_c2c_file')) . '">دیدن تصویر رسید</a></p>';
 	}
-	if ($order->has_status('on-hold')) {
+	if ($order->has_status('on-hold') || $order->get_meta('_avpr_c2c_provisional')) {
+		if ($order->get_meta('_avpr_c2c_provisional')) echo '<p style="color:#b26a00"><b>تایید موقت:</b> فایل تحویل شده ولی پیامک واریز هنوز نرسیده. اگر واریز را در حساب دیدید، تایید کنید.</p>';
 		$u = function ($a) use ($order) { return esc_url(wp_nonce_url(admin_url('admin-post.php?action=avpr_c2c_' . $a . '&order=' . $order->get_id()), 'avpr_c2c_act')); };
 		echo '<p><a class="button button-primary" href="' . $u('confirm') . '">تایید پرداخت و آماده‌سازی سفارش</a></p><p><a class="button" href="' . $u('reject') . '" onclick="return confirm(\'رسید رد شود؟\')">رد رسید</a></p>';
 	}
@@ -331,7 +342,7 @@ foreach (['confirm', 'reject'] as $act) {
 		if (!current_user_can('edit_shop_orders') || !wp_verify_nonce($_GET['_wpnonce'] ?? '', 'avpr_c2c_act')) wp_die('دسترسی ندارید');
 		$o = wc_get_order((int) $_GET['order']);
 		if ($o) {
-			if ($act === 'confirm') $o->update_status('processing', 'پرداخت کارت به کارت دستی تایید شد.');
+			if ($act === 'confirm') { $o->delete_meta_data('_avpr_c2c_provisional'); $o->save(); $o->update_status(avpr_c2c_final_status($o), 'پرداخت کارت به کارت دستی تایید شد.'); }
 			else { $o->delete_meta_data('_avpr_c2c_receipt'); $o->save(); $o->add_order_note('رسید کارت به کارت رد شد؛ مشتری می‌تواند رسید درست را دوباره ثبت کند.', true); }
 		}
 		wp_safe_redirect(wp_get_referer() ?: admin_url('edit.php?post_type=shop_order')); exit;

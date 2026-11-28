@@ -1,8 +1,8 @@
 <?php
 /**
  * Plugin Name: AVPR Site Kit
- * Description: سفارشی‌سازی‌های avpr.ir که نباید با به‌روزرسانی پوسته پاک شوند: آیکون و شمارندهٔ سبد خرید فروشگاه، تیتر کوتاه اسلایدر، بخش «گفت‌وگو و یادداشت» صفحهٔ اول، پنهان‌سازی کادر نویسنده، فونت فرهنگ برای کل سایت. هر بخش فقط وقتی فعال می‌شود که پوسته خودش آن را نداشته باشد (بعد از به‌روزرسانی پوسته).
- * Version: 1.2.0
+ * Description: سفارشی‌سازی‌های avpr.ir که نباید با به‌روزرسانی پوسته پاک شوند: آیکون و شمارندهٔ سبد خرید فروشگاه، تیتر کوتاه اسلایدر، بخش «گفت‌وگو و یادداشت» صفحهٔ اول، پنهان‌سازی کادر نویسنده، فونت فرهنگ برای کل سایت، لینکدین و دکمه‌های ارتباط با ادمین، صفحهٔ تبلیغ در فاخته. هر بخش فقط وقتی فعال می‌شود که پوسته خودش آن را نداشته باشد (بعد از به‌روزرسانی پوسته).
+ * Version: 1.3.0
  * Author: AVPR
  * Requires at least: 6.0
  */
@@ -21,6 +21,58 @@ final class AVPR_Site_Kit {
         add_action('wp_footer', [__CLASS__, 'interviews'], 21);
         add_action('begin_fetch_post_thumbnail_html', [__CLASS__, 'thumb_begin'], 10, 3);
         add_filter('the_title', [__CLASS__, 'slider_title'], 20, 2);
+        add_action('wp_footer', [__CLASS__, 'social'], 22);
+        add_action('wp_head', [__CLASS__, 'ads_css'], 101);
+        add_action('admin_init', [__CLASS__, 'settings']);
+        add_shortcode('avpr_admin_contact', [__CLASS__, 'sc_admin']);
+    }
+
+    /* ---------- 5) Contact links (Settings → General → «راه‌های ارتباطی AVPR») ---------- */
+    static $defaults = [
+        'avpr_linkedin'       => ['لینکدین AVPR', 'https://www.linkedin.com/company/aviation-public-relations'],
+        'avpr_admin_bale'     => ['بلهٔ ادمین', 'https://ble.ir/ma_fakharmanesh'],
+        'avpr_admin_telegram' => ['تلگرام ادمین', 'https://t.me/ma_fakharmanesh'],
+    ];
+    static function link($k) {
+        $v = trim((string) get_option($k, ''));
+        return $v !== '' ? $v : self::$defaults[$k][1];
+    }
+    static function settings() {
+        add_settings_section('avpr_contacts', 'راه‌های ارتباطی AVPR', function () {
+            echo '<p>تلگرام، اینستاگرام و بلهٔ کانال از «تنظیمات پوسته ← شبکه‌های اجتماعی» می‌آیند. این‌ها لینکدین و دکمه‌های «پیام به ادمین» (فوتر، تماس با ما، صفحهٔ تبلیغ در فاخته) هستند. نشانی کامل بنویسید.</p>';
+        }, 'general');
+        foreach (self::$defaults as $k => $d) {
+            register_setting('general', $k, ['type' => 'string', 'sanitize_callback' => 'esc_url_raw']);
+            add_settings_field($k, $d[0], function () use ($k, $d) {
+                printf('<input type="url" class="regular-text ltr" dir="ltr" name="%s" value="%s" placeholder="%s">', esc_attr($k), esc_attr(get_option($k, '')), esc_attr($d[1]));
+            }, 'general', 'avpr_contacts');
+        }
+    }
+    static function sc_admin() {
+        return '<div class="avpr-admin-btns"><a class="avpr-btn bale" href="' . esc_url(self::link('avpr_admin_bale')) . '" target="_blank" rel="noopener"><i class="efa efa-bale"></i>پیام در بله</a>'
+             . '<a class="avpr-btn tg" href="' . esc_url(self::link('avpr_admin_telegram')) . '" target="_blank" rel="noopener"><i class="bi bi-telegram"></i>پیام در تلگرام</a></div>';
+    }
+    static function social() {
+        if (is_admin()) return;
+        $li = esc_url(self::link('avpr_linkedin'));
+        $admin = self::sc_admin();
+        ?>
+<script id="avpr-kit-social">(function(){
+var LI='<?php echo $li; ?>';
+function icon(a){var i=a.querySelector('i');if(i)i.className='bi bi-linkedin';}
+function run(){
+  var hs=document.querySelector('.header__comfort--social ul.social');
+  if(hs&&!hs.querySelector('.avpr-li')){var src=hs.querySelector('li');if(src){var li=src.cloneNode(true);li.classList.add('avpr-li');var a=li.querySelector('a');a.href=LI;a.className='';a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','لینکدین');icon(a);hs.appendChild(li);}}
+  document.querySelectorAll('footer .social .body').forEach(function(b){
+    if(b.querySelector('.linkedin'))return;var src=b.querySelector('a');if(!src)return;
+    var a=src.cloneNode(true);a.className='linkedin';a.href=LI;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','لینکدین');icon(a);a.style.background='#0a66c2';b.appendChild(a);
+    if(!b.parentNode.querySelector('.avpr-foot-admin')){var d=document.createElement('div');d.className='avpr-foot-admin';d.innerHTML='<span>ارتباط با ادمین</span>'+<?php echo wp_json_encode($admin); ?>;b.parentNode.appendChild(d);}
+  });
+  document.querySelectorAll('ul.social a, footer .social .body a').forEach(function(a){if(/^https?:/.test(a.getAttribute('href')||'')){a.target='_blank';a.rel='noopener';}});
+}
+if(document.readyState!=='loading')run();else document.addEventListener('DOMContentLoaded',run);
+})();</script>
+        <?php
     }
 
     /** ?avpr_kit_force=1 (admins only) simulates an unpatched theme, for testing. */
@@ -43,9 +95,38 @@ final class AVPR_Site_Kit {
     static function css() {
         echo "<style id=\"avpr-kit-css\">.author_box{display:none!important}"
            . ".avpr-cart{position:relative}.avpr-cart-count{position:absolute;top:-6px;left:-6px;min-width:19px;height:19px;padding:0 5px;border-radius:10px;background:#e31e24;color:#fff;font-size:11px;font-weight:700;line-height:19px;text-align:center;box-shadow:0 0 0 2px #fff;display:none}.avpr-cart-count.on{display:block}"
+           . ".avpr-admin-btns{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 18px}.avpr-btn{display:inline-flex;align-items:center;gap:8px;padding:11px 20px;border-radius:12px;color:#fff!important;text-decoration:none!important;font-weight:700!important;font-size:15px;line-height:1.4;transition:transform .15s,box-shadow .15s}.avpr-btn:hover{transform:translateY(-2px);box-shadow:0 8px 18px rgba(0,0,0,.15)}.avpr-btn i{font-size:18px}.avpr-btn.bale{background:#1fb68c}.avpr-btn.tg{background:#229ed9}"
+           . ".avpr-foot-admin{margin-top:16px}.avpr-foot-admin>span{display:block;margin-bottom:8px;opacity:.85;font-size:14px}.avpr-foot-admin .avpr-admin-btns{margin:0}.avpr-foot-admin .avpr-btn{padding:8px 14px;font-size:13.5px;border-radius:10px}"
            . "</style>\n";
     }
 
+
+
+    /* ---------- 6) «تبلیغ در فاخته» landing page styles (page slug faakhte-ads) ---------- */
+    static function ads_css() {
+        if (!is_page('faakhte-ads')) return;
+        echo '<style id="avpr-kit-ads">'
+        . '.avpr-ads{--l:#1F3563;--g:#C9962B;--p:#F3E9DA;--c:#FBF6EE;--i:#2A2320;--m:#6B5F51;color:var(--i);font-size:16px;line-height:2}'
+        . '.avpr-ads *{box-sizing:border-box}.avpr-ads h2{font-size:24px!important;font-weight:900!important;color:var(--l)!important;margin:0 0 14px!important;line-height:1.6!important}'
+        . '.avpr-ads section{margin:0 0 34px}'
+        . '.ads-hero{display:grid;grid-template-columns:1.25fr 1fr;gap:28px;align-items:center;background:linear-gradient(135deg,#1F3563,#2d4d8a);color:#F6EEDD;border-radius:22px;padding:34px 34px 0;overflow:hidden}'
+        . '.ads-hero .k{display:inline-block;background:rgba(227,180,81,.18);color:#E9C46A;border-radius:20px;padding:2px 14px;font-size:13.5px;font-weight:700;margin-bottom:10px}'
+        . '.ads-hero h1{color:#fff!important;font-size:30px!important;line-height:1.6!important;margin:0 0 12px!important}.ads-hero p{color:#e9e2d4!important;margin:0 0 18px!important;font-size:16px!important}'
+        . '.ads-hero .ph{align-self:end;text-align:center}.ads-hero .ph img{width:100%;max-width:300px;border-radius:26px 26px 0 0;box-shadow:0 -6px 30px rgba(0,0,0,.35);display:inline-block}'
+        . '.ads-hero .avpr-admin-btns{margin-bottom:30px}'
+        . '.ads-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}'
+        . '.ads-card{background:var(--c);border:1px solid #E0D0B8;border-radius:18px;padding:20px 22px}.ads-card h3{font-size:18.5px!important;font-weight:900!important;color:var(--l)!important;margin:0 0 6px!important}'
+        . '.ads-card p{margin:0 0 8px!important;font-size:15px!important;line-height:1.95!important}.ads-card small{display:block;color:var(--m);font-size:13.5px;font-weight:500!important}'
+        . '.ads-card .n{display:inline-flex;width:34px;height:34px;border-radius:10px;background:var(--l);color:#E9C46A;align-items:center;justify-content:center;font-weight:900;margin-bottom:8px}'
+        . '.ads-chips{display:flex;flex-wrap:wrap;gap:10px}.ads-chips span{background:#F5E6BF;color:#8A6414;border-radius:22px;padding:6px 16px;font-weight:700;font-size:14.5px}'
+        . '.ads-steps{counter-reset:s;display:grid;grid-template-columns:repeat(4,1fr);gap:14px;list-style:none;padding:0!important;margin:0!important}'
+        . '.ads-steps li{counter-increment:s;background:var(--c);border:1px solid #E0D0B8;border-radius:16px;padding:16px;font-size:15px;line-height:1.9!important;margin:0!important}'
+        . '.ads-steps li:before{content:counter(s,persian);display:block;font-size:26px;font-weight:900;color:var(--g);line-height:1.3}'
+        . '.ads-cta{background:var(--p);border-radius:20px;padding:26px;text-align:center}.ads-cta .avpr-admin-btns{justify-content:center;margin:12px 0 0}'
+        . '.ads-print{display:grid;grid-template-columns:1fr 1.3fr;gap:20px;align-items:center}.ads-print img{width:100%;border-radius:16px}'
+        . '@media(max-width:767px){.ads-hero{grid-template-columns:1fr;padding:24px 20px 0}.ads-hero h1{font-size:24px!important}.ads-grid,.ads-print{grid-template-columns:1fr}.ads-steps{grid-template-columns:1fr 1fr}}'
+        . '</style>' . "\n";
+    }
 
     /* ---------- 0) Site-ownership verification meta tags ---------- */
     static function verification() {

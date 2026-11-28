@@ -65,7 +65,7 @@ function run(){
   if(hs&&!hs.querySelector('.avpr-li')){var src=hs.querySelector('li');if(src){var li=src.cloneNode(true);li.classList.add('avpr-li');var a=li.querySelector('a');a.href=LI;a.className='';a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','لینکدین');icon(a);hs.appendChild(li);}}
   document.querySelectorAll('footer .social .body').forEach(function(b){
     if(b.querySelector('.linkedin'))return;var src=b.querySelector('a');if(!src)return;
-    var a=src.cloneNode(true);a.className='linkedin';a.href=LI;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','لینکدین');icon(a);a.style.background='#0a66c2';b.appendChild(a);
+    var a=src.cloneNode(true);a.className='linkedin';a.href=LI;a.target='_blank';a.rel='noopener';a.setAttribute('aria-label','لینکدین');icon(a);b.appendChild(a);
     if(!b.parentNode.querySelector('.avpr-foot-admin')){var d=document.createElement('div');d.className='avpr-foot-admin';d.innerHTML='<span>ارتباط با ادمین</span>'+<?php echo wp_json_encode($admin); ?>;b.parentNode.appendChild(d);}
   });
   document.querySelectorAll('ul.social a, footer .social .body a').forEach(function(a){if(/^https?:/.test(a.getAttribute('href')||'')){a.target='_blank';a.rel='noopener';}});

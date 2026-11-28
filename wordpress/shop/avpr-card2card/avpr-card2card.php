@@ -2,13 +2,13 @@
 /**
  * Plugin Name: AVPR کارت به کارت
  * Description: پرداخت کارت به کارت برای ووکامرس: نمایش شماره کارت به مشتری، فرم ارسال رسید (شماره پیگیری، ۴ رقم آخر کارت، مبلغ، تاریخ، تصویر رسید)، بررسی خودکار رسید و تطبیق با پیامک واریز بانک، و تایید یک‌کلیکی سفارش.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: AVPR
  * Requires Plugins: woocommerce
  */
 if (!defined('ABSPATH')) exit;
 
-define('AVPR_C2C_VER', '1.1.0');
+define('AVPR_C2C_VER', '1.2.0');
 
 /* ================= helpers ================= */
 function avpr_c2c_en($s) { return strtr((string)$s, ['۰'=>'0','۱'=>'1','۲'=>'2','۳'=>'3','۴'=>'4','۵'=>'5','۶'=>'6','۷'=>'7','۸'=>'8','۹'=>'9','٠'=>'0','١'=>'1','٢'=>'2','٣'=>'3','٤'=>'4','٥'=>'5','٦'=>'6','٧'=>'7','٨'=>'8','٩'=>'9','٬'=>',','،'=>',']); }
@@ -161,12 +161,25 @@ add_action('template_redirect', function () {
 		$order->update_status('processing', 'تایید موقت بر اساس رسید (سفارش فایل): لینک دانلود فعال شد. پیامک واریز بانک هنوز تطبیق داده نشده؛ واریز را در حساب بررسی کنید.');
 	}
 	$state = $order->has_status('processing') ? ($order->get_meta('_avpr_c2c_provisional') ? 'تایید موقت (فایل تحویل شد؛ واریز را در حساب بررسی کنید)' : 'تایید شد') : 'در انتظار تایید شما';
-	wp_mail(avpr_c2c_admin_emails(), 'رسید کارت به کارت — سفارش #' . $order->get_order_number() . ' — ' . $state,
+	avpr_c2c_mail_later(avpr_c2c_admin_emails(), 'رسید کارت به کارت — سفارش #' . $order->get_order_number() . ' — ' . $state,
 		'مشتری رسید پرداخت را ثبت کرد.' . "\n\nوضعیت: " . $state . "\nبررسی خودکار: " . avpr_c2c_checks_text($checks) . "\nشماره پیگیری: " . $r['ref'] . ' | کارت ****' . $r['last4'] . ' | ' . number_format($r['amount_toman']) . " تومان\n\nمدیریت سفارش:\n" . $order->get_edit_order_url());
 	wc_add_notice('رسید شما ثبت شد. پس از تایید، سفارش ارسال می‌شود.', 'success');
 	wp_safe_redirect(add_query_arg([], wp_get_referer() ?: $order->get_view_order_url())); exit;
 });
 
+/** queue an email to be sent after the response has been delivered to the customer */
+function avpr_c2c_mail_later($to, $subject, $body) {
+	static $q = null;
+	if ($q === null) {
+		$q = [];
+		add_action('shutdown', function () use (&$q) {
+			if (!$q) return;
+			if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+			foreach ($q as $m) wp_mail($m[0], $m[1], $m[2]);
+		}, 20);
+	}
+	$q[] = [$to, $subject, $body];
+}
 function avpr_c2c_admin_emails() {
 	$list = array_filter(array_map('trim', explode(',', (string) avpr_c2c_opt('notify_emails', 'mfakharmanesh@gmail.com'))));
 	$list[] = get_option('admin_email');
@@ -180,7 +193,7 @@ function avpr_c2c_only_digital($order) {
 add_action('woocommerce_order_status_pending_to_on-hold', function ($id) {
 	$o = wc_get_order($id); if (!$o || $o->get_payment_method() !== 'avpr_c2c') return;
 	$lines = []; foreach ($o->get_items() as $it) $lines[] = '- ' . $it->get_name() . ' × ' . $it->get_quantity();
-	wp_mail(avpr_c2c_admin_emails(), 'سفارش تازه #' . $o->get_order_number() . ' — فروشگاه AVPR',
+	avpr_c2c_mail_later(avpr_c2c_admin_emails(), 'سفارش تازه #' . $o->get_order_number() . ' — فروشگاه AVPR',
 		"سفارش تازه با پرداخت کارت به کارت ثبت شد.\n\nمشتری: " . $o->get_formatted_billing_full_name() . ' — ' . $o->get_billing_phone() . ' — ' . $o->get_billing_email() . "\nمبلغ: " . number_format((float) $o->get_total()) . " تومان\n" . implode("\n", $lines) . "\n\nمدیریت سفارش:\n" . $o->get_edit_order_url());
 });
 

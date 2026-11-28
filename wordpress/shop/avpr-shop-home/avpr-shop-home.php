@@ -2,7 +2,7 @@
 /**
  * Plugin Name: AVPR صفحهٔ اول فروشگاه
  * Description: اسلایدر قابل مدیریت صفحهٔ اول فروشگاه (منوی «اسلایدهای فروشگاه»)، و نمایش جداگانهٔ قیمت هر نوع نسخه (مثلاً PDF و چاپی) به‌جای بازهٔ قیمت.
- * Version: 1.1.0
+ * Version: 1.2.0
  * Author: AVPR
  */
 if (!defined('ABSPATH')) exit;
@@ -114,3 +114,33 @@ add_filter('woocommerce_get_script_data', function ($data, $handle) {
 	if ($handle === 'wc-password-strength-meter' && is_array($data)) { $data['min_password_strength'] = 1; $data['i18n_password_hint'] = 'رمز دست‌کم ۶ نویسه باشد.'; }
 	return $data;
 }, 10, 2);
+
+/* ---------- Faster checkout: send WooCommerce emails after the customer gets the response ---------- */
+add_filter('woocommerce_defer_transactional_emails', '__return_true');
+add_action('shutdown', function () {
+	// deliver the page/AJAX answer first, then let deferred emails go out
+	if ((defined('DOING_AJAX') && DOING_AJAX) || isset($_GET['wc-ajax']) || (defined('REST_REQUEST') && REST_REQUEST) || (function_exists('is_checkout') && did_action('wp') && is_checkout())) {
+		if (function_exists('fastcgi_finish_request')) @fastcgi_finish_request();
+	}
+}, 0);
+
+/* ---------- Email typos: confirm field + "did you mean" hint ---------- */
+add_filter('woocommerce_checkout_fields', function ($f) {
+	if (isset($f['billing']['billing_email'])) {
+		$prio = (int) ($f['billing']['billing_email']['priority'] ?? 110);
+		$f['billing']['billing_email_confirm'] = ['label' => 'تکرار آدرس ایمیل', 'required' => true, 'type' => 'email', 'class' => ['form-row-wide'], 'priority' => $prio + 1, 'autocomplete' => 'off',
+			'description' => 'لینک دانلود و تأیید سفارش به این ایمیل فرستاده می‌شود؛ لطفاً با دقت وارد کنید.'];
+	}
+	return $f;
+}, 30);
+add_action('woocommerce_after_checkout_validation', function ($data, $errors) {
+	if (!isset($_POST['billing_email_confirm'])) return;
+	$a = strtolower(trim((string) ($data['billing_email'] ?? ''))); $b = strtolower(trim(wp_unslash((string) $_POST['billing_email_confirm'])));
+	if ($a !== $b) $errors->add('validation', '<strong>ایمیل و تکرار ایمیل</strong> یکی نیستند. لطفاً دوباره بررسی کنید.');
+}, 10, 2);
+add_action('wp_footer', function () {
+	if (!function_exists('is_checkout') || !(is_checkout() || is_account_page())) return; ?>
+<script>(function(){var D={'gmial.com':'gmail.com','gmal.com':'gmail.com','gmai.com':'gmail.com','gmail.co':'gmail.com','gmail.con':'gmail.com','gamil.com':'gmail.com','gnail.com':'gmail.com','gmail.cm':'gmail.com','yahho.com':'yahoo.com','yaho.com':'yahoo.com','yahoo.co':'yahoo.com','hotmial.com':'hotmail.com','hotmail.co':'hotmail.com','outlok.com':'outlook.com','outlook.co':'outlook.com','iclod.com':'icloud.com','icloud.co':'icloud.com'};
+function hint(inp){var v=(inp.value||'').trim(),at=v.lastIndexOf('@'),box=inp.parentNode.querySelector('.avpr-mail-hint');if(!box){box=document.createElement('div');box.className='avpr-mail-hint';box.style.cssText='margin-top:6px;font-size:13px;color:#c8102e';inp.parentNode.appendChild(box)}box.innerHTML='';if(at<1)return;var dom=v.slice(at+1).toLowerCase();if(D[dom]){var s=v.slice(0,at+1)+D[dom];box.innerHTML='منظورتان <a href="#" style="font-weight:700;direction:ltr;unicode-bidi:embed">'+s+'</a> بود؟';box.querySelector('a').onclick=function(e){e.preventDefault();inp.value=s;inp.dispatchEvent(new Event('change',{bubbles:true}));box.innerHTML=''}}}
+document.addEventListener('input',function(e){if(e.target&&e.target.type==='email')hint(e.target)});document.addEventListener('blur',function(e){if(e.target&&e.target.type==='email')hint(e.target)},true);})();</script>
+<?php });
